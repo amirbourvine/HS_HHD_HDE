@@ -134,7 +134,10 @@ def padWithZeros_torch(X, left_margin, right_margin, top_margin, bottom_margin, 
     else:
         newX = []
 
-    return newX
+    return newX 
+
+def stam():
+    pass
 
 def calc_patch_label_torch(labels, i, j, rows_factor, cols_factor, method='center'):
     if method=='center':
