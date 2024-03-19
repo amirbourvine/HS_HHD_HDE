@@ -28,6 +28,7 @@ def hdd_torch(X,P):
 
         del norms
         del sum_matrix
+        torch.cuda.empty_cache()
 
     return d_HDD
 
@@ -55,37 +56,40 @@ def svd_symmetric_torch(M):
 
 
 def calc_svd_p_torch(d):
-  epsilon = CONST_C*torch.median(d)
+  epsilon = CONST_C*torch.mean(d, dim=tuple(np.arange(len(d.shape))))
+
   W = torch.exp(-1*d/epsilon)
   S_vec = torch.sum(W,dim=1)
 
   S = torch.diag(1/S_vec)
+  del S_vec
   W_gal = torch.matmul(torch.matmul(S,W),S)
+  del W
+  del S
 
   D_vec = torch.sum(W_gal,dim=1)
 
   D_minus_half = torch.diag(1 / torch.sqrt(D_vec))
   D_plus_half = torch.diag(torch.sqrt(D_vec))
-
+  del D_vec
 
   M = torch.matmul(torch.matmul(D_minus_half,W_gal),D_minus_half)
+  del W_gal
 
-  del S
+  torch.cuda.empty_cache()
 
   U,S,UT = svd_symmetric_torch(M)
+  del M
 
   res = (torch.matmul(D_minus_half,U)),(S),(torch.matmul(UT,D_plus_half))
 
-  del W
-  del S_vec
+
   del S
-  del W_gal
-  del D_vec
   del D_minus_half
   del D_plus_half
-  del M
   del U
   del UT
+  torch.cuda.empty_cache()
 
   return res
 
@@ -109,10 +113,12 @@ def hde_torch(shortest_paths_mat):
 
     del aux
     del S
+    torch.cuda.empty_cache()
 
   del U
   del Vt
   del S_keep
+  torch.cuda.empty_cache()
 
   return X
 
@@ -194,36 +200,38 @@ def normalize_each_band_torch(X):
 import time
 
 def calc_P_torch(d, apply_2_norm=False):
-  epsilon = CONST_C*torch.median(d)
+  epsilon = CONST_C*torch.mean(d, dim=tuple(np.arange(len(d.shape))))
+
+  print("epsilon: ", epsilon)
   W = torch.exp(-1*d/epsilon)
 
   if apply_2_norm:
     S_vec = torch.sum(W,dim=1)
 
     S = torch.diag(1/S_vec)
+    del S_vec
     
     W_gal = torch.matmul(torch.matmul(S,W),S)
-    
+    del S
 
     D_vec = torch.sum(W_gal,dim=1)
     D = torch.diag(1 / D_vec)
+    del D_vec
     P = torch.matmul(D,W_gal)
 
-    del S_vec
-    del S
     del W_gal
-    del D_vec
     del D
 
   else:
     D_vec = torch.sum(W,dim=1)
     D = torch.diag(1/ D_vec)
+    del D_vec
     P = torch.matmul(D,W)
 
-    del D_vec
     del D
 
   del W
+  torch.cuda.empty_cache()
 
   return P
 
@@ -258,6 +266,7 @@ def prepare_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, me
     distances = torch.cdist(X_patches, X_patches)
     
     del X_patches
+    torch.cuda.empty_cache()
     # print("DISTANCES WITH CDIST: ", time.time()-st)
     # st = time.time()
 
@@ -287,6 +296,7 @@ def calc_hdd_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, m
     HDE = hde_torch(distances)
 
     del distances
+    torch.cuda.empty_cache()
 
     torch.abs(HDE, out=HDE)
 
@@ -298,6 +308,7 @@ def calc_hdd_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, m
     hdd_mat = hdd_torch(HDE, P)
 
     del HDE
+    torch.cuda.empty_cache()
     # hdd_mat_2 = hdd(HDE, P)
     # print("NORM: ", np.linalg.norm(hdd_mat-hdd_mat_2))
 
@@ -355,6 +366,7 @@ def whole_pipeline_divided_torch(X,y, rows_factor, cols_factor, is_normalize_eac
             del d_HDD
             del labels_padded
             del y_patches
+            torch.cuda.empty_cache()
 
     
 
