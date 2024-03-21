@@ -44,9 +44,12 @@ def hdd_torch(X,P):
 
  
 def svd_symmetric_torch(M):
+  print("svd_symmetric_torch-1", flush=True)
+  print("M.shape: ", M.shape)
   s,u = torch.linalg.eigh(M)  #eigenvalues and eigenvectors
-
+  print("svd_symmetric_torch-2", flush=True)
   s, indices = torch.sort(s, descending=True)
+  print("svd_symmetric_torch-3", flush=True)
   u = u[:, indices]
 
   v = u.clone()
@@ -60,39 +63,38 @@ def svd_symmetric_torch(M):
 
  
 def calc_svd_p_torch(d):
-  print("calc_svd_p_torch-1", flush=True)
   epsilon = CONST_C*torch.mean(d, dim=tuple(np.arange(len(d.shape))))
-  print("calc_svd_p_torch-2", flush=True)
-  W = torch.exp(-1*d/epsilon)
-  print("calc_svd_p_torch-3", flush=True)
-  S_vec = torch.sum(W,dim=1)
-  print("calc_svd_p_torch-4", flush=True)
-  S = torch.diag(1/S_vec)
-  print("calc_svd_p_torch-5", flush=True)
-  del S_vec
-  print("calc_svd_p_torch-6", flush=True)
-  print("S.shape: ", S.shape, flush=True)
-  print("W.shape: ", W.shape, flush=True)
 
+  W = torch.exp(-1*d/epsilon)
+
+  S_vec = torch.sum(W,dim=1)
+  S = torch.diag(1/S_vec)
+  
+  del S_vec
+  # print("S.shape: ", S.shape, flush=True)
+  # print("W.shape: ", W.shape, flush=True)
+  
+  # res1 = torch.mm(S,W) 
+
+  S = S.type(torch.float32)
+  W = W.type(torch.float32)
 
   W_gal_tmp = torch.mm(S,W)
-  print("calc_svd_p_torch-6.5", flush=True)
-  print("S.shape: ", S.shape, flush=True)
-  print("W_gal_tmp.shape: ", W_gal_tmp.shape, flush=True)
+
+  # print("TEST: ", torch.linalg.norm(res1-W_gal_tmp))
+  # print("S.shape: ", S.shape, flush=True)
+  # print("W_gal_tmp.shape: ", W_gal_tmp.shape, flush=True)
   
-  # W_gal = torch.bmm(W_gal_tmp.unsqueeze(0).expand_as(S), S)
+  W_gal_tmp = W_gal_tmp.type(torch.float32)
+
   W_gal = torch.mm(W_gal_tmp,S)
   
-  print("calc_svd_p_torch-7", flush=True)
+  
   del W_gal_tmp
   del W
   del S
 
-  print("calc_svd_p_torch-8", flush=True)
-
   D_vec = torch.sum(W_gal,dim=1)
-
-  print("calc_svd_p_torch-9", flush=True)
   
   D_minus_half = torch.diag(1 / torch.sqrt(D_vec))
   D_plus_half = torch.diag(torch.sqrt(D_vec))
@@ -103,13 +105,13 @@ def calc_svd_p_torch(d):
   del W_gal
 #   gc.collect()
 #   torch.cuda.empty_cache()
-
-
+  print("calc_svd_p_torch-1", flush=True)
   U,S,UT = svd_symmetric_torch(M)
   del M
   
+  print("calc_svd_p_torch-2", flush=True)
   res = (torch.matmul(D_minus_half,U)),(S),(torch.matmul(UT,D_plus_half))
-
+  print("calc_svd_p_torch-3", flush=True)
 
   del S
   del D_minus_half
