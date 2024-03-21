@@ -16,6 +16,9 @@ import gc
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 print("device: ", device)
+cpu = torch.device("cpu")
+
+
 
  
 def hdd_torch(X,P):
@@ -57,35 +60,53 @@ def svd_symmetric_torch(M):
 
  
 def calc_svd_p_torch(d):
-  print("calc_svd_p_torch- 1", flush=True)
+  print("calc_svd_p_torch-1", flush=True)
   epsilon = CONST_C*torch.mean(d, dim=tuple(np.arange(len(d.shape))))
-
-  W = torch.exp(-1*d/epsilon)
-  S_vec = torch.sum(W,dim=1)
-  
   print("calc_svd_p_torch-2", flush=True)
-  S = torch.diag(1/S_vec)
-  del S_vec
+  W = torch.exp(-1*d/epsilon)
   print("calc_svd_p_torch-3", flush=True)
-  W_gal = torch.matmul(torch.matmul(S,W),S)
+  S_vec = torch.sum(W,dim=1)
+  print("calc_svd_p_torch-4", flush=True)
+  S = torch.diag(1/S_vec)
+  print("calc_svd_p_torch-5", flush=True)
+  del S_vec
+  print("calc_svd_p_torch-6", flush=True)
+  print("S.shape: ", S.shape, flush=True)
+  print("W.shape: ", W.shape, flush=True)
+
+
+  W_gal_tmp = torch.mm(S,W)
+  print("calc_svd_p_torch-6.5", flush=True)
+  print("S.shape: ", S.shape, flush=True)
+  print("W_gal_tmp.shape: ", W_gal_tmp.shape, flush=True)
+  
+  W_gal = torch.mm(W_gal_tmp,S)
+  
+  print("calc_svd_p_torch-7", flush=True)
+  del W_gal_tmp
   del W
   del S
 
+  print("calc_svd_p_torch-8", flush=True)
+
   D_vec = torch.sum(W_gal,dim=1)
 
+  print("calc_svd_p_torch-9", flush=True)
+  
   D_minus_half = torch.diag(1 / torch.sqrt(D_vec))
   D_plus_half = torch.diag(torch.sqrt(D_vec))
   del D_vec
-
+  
   M = torch.matmul(torch.matmul(D_minus_half,W_gal),D_minus_half)
   
   del W_gal
 #   gc.collect()
 #   torch.cuda.empty_cache()
 
+
   U,S,UT = svd_symmetric_torch(M)
   del M
-
+  
   res = (torch.matmul(D_minus_half,U)),(S),(torch.matmul(UT,D_plus_half))
 
 
@@ -109,6 +130,7 @@ def hde_torch(shortest_paths_mat):
   S_keep = S_keep.double()
   Vt = Vt.double()
 
+  print("hde_torch- BEFORE LOOP", flush=True)
   X = torch.zeros((CONST_K + 1, shortest_paths_mat.shape[0], shortest_paths_mat.shape[1] + 1), dtype=torch.float64, device=device)
   for k in range (0, CONST_K + 1):
     S = torch.float_power(S_keep, 2 ** (-k))
@@ -122,6 +144,8 @@ def hde_torch(shortest_paths_mat):
     del S
     # gc.collect()
     # torch.cuda.empty_cache()
+  
+  print("hde_torch- AFTER LOOP", flush=True)
 
   del U
   del Vt
@@ -309,7 +333,7 @@ def calc_hdd_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, m
     # gc.collect()
     # torch.cuda.empty_cache()
 
-    print("calc_hdd_torch", flush=True)
+    print("calc_hdd_torch-before HDE", flush=True)
 
     HDE = hde_torch(distances)
 
@@ -323,8 +347,11 @@ def calc_hdd_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, m
     st = time.time()
 
     # print("HDE.shape: ", HDE.shape)
-    
+    print("calc_hdd_torch-before HDD", flush=True)
+
     hdd_mat = hdd_torch(HDE, P)
+
+    print("calc_hdd_torch-after HDD", flush=True)
 
     del HDE
     # gc.collect()
@@ -349,7 +376,7 @@ def whole_pipeline_all_torch(X,y, rows_factor, cols_factor, is_normalize_each_ba
 
         d_HDD, labels_padded, num_patches_in_row,y_patches = calc_hdd_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=is_normalize_each_band, method_label_patch=method_label_patch)
 
-        print("WHOLE METHOD TIME: ", time.time()-st)
+        print("WHOLE METHOD TIME: ", time.time()-st, flush=True)
         st = time.time()
 
         print("XXXXXXX IN CLASSIFICATION XXXXXXXXX")
