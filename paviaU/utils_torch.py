@@ -80,6 +80,7 @@ def calc_svd_p_torch(d):
   print("S.shape: ", S.shape, flush=True)
   print("W_gal_tmp.shape: ", W_gal_tmp.shape, flush=True)
   
+  # W_gal = torch.bmm(W_gal_tmp.unsqueeze(0).expand_as(S), S)
   W_gal = torch.mm(W_gal_tmp,S)
   
   print("calc_svd_p_torch-7", flush=True)
