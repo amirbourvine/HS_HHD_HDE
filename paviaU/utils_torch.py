@@ -44,10 +44,24 @@ def hdd_torch(X,P):
 
  
 def svd_symmetric_torch(M):
-  print("svd_symmetric_torch-1", flush=True)
-  print("M.shape: ", M.shape)
-  s,u = torch.linalg.eigh(M)  #eigenvalues and eigenvectors
-  print("svd_symmetric_torch-2", flush=True)
+  # print("svd_symmetric_torch-1", flush=True)
+  # if torch.cuda.is_available():
+  #   M_cpu = M.to("cpu")
+  #   del M
+  #   print("HERE", flush=True)
+  #   print("M_cpu: ", M_cpu.device, M_cpu.dtype,  flush=True)
+  #   s,u = torch.linalg.eigh(M_cpu)
+
+  #   print("s: ", s.device, flush=True)
+  #   print("u: ", u.device, flush=True)
+
+  #   s.to(device)
+  #   u.to(device)
+
+  # else:
+  #   s,u = torch.linalg.eigh(M)  #eigenvalues and eigenvectors
+  s,u = torch.linalg.eigh(M)
+
   s, indices = torch.sort(s, descending=True)
   print("svd_symmetric_torch-3", flush=True)
   u = u[:, indices]
@@ -105,13 +119,10 @@ def calc_svd_p_torch(d):
   del W_gal
 #   gc.collect()
 #   torch.cuda.empty_cache()
-  print("calc_svd_p_torch-1", flush=True)
   U,S,UT = svd_symmetric_torch(M)
   del M
   
-  print("calc_svd_p_torch-2", flush=True)
   res = (torch.matmul(D_minus_half,U)),(S),(torch.matmul(UT,D_plus_half))
-  print("calc_svd_p_torch-3", flush=True)
 
   del S
   del D_minus_half
