@@ -316,8 +316,6 @@ def calc_hdd_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, m
 
     return hdd_mat, labels_padded, num_patches_in_row,y_patches
 
-
-
 def whole_pipeline_all_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, method_label_patch='center'):
     print("XXXXXXX IN METHOD XXXXXXXXX")
     st = time.time()
