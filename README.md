@@ -9,7 +9,7 @@ pip3 install torch torchvision torchaudio --index-url https://download.pytorch.o
 
 
 TO RUN:
-RUN the paviaU/whole_pipeline.ipynb notebook for visualization.
+RUN the entire paviaU/whole_pipeline.ipynb notebook.
 
 MAKE SURE that all of the files are in the same directory (including the csv's)
 
