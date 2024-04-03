@@ -11,13 +11,16 @@ sys.path.append(parent_dir)
 from utils import CONST_K,ALPHA,TOL,CONST_C, hdd_try, hde
 from classification import main_divided, main
 
-
+import gc
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 print("device: ", device)
+cpu = torch.device("cpu")
 
 
+
+ 
 def hdd_torch(X,P):
     d_HDD = torch.zeros_like(P, device=device)
 
@@ -28,7 +31,8 @@ def hdd_torch(X,P):
 
         del norms
         del sum_matrix
-        torch.cuda.empty_cache()
+        # gc.collect()
+        # torch.cuda.empty_cache()
 
     return d_HDD
 
@@ -38,11 +42,28 @@ def hdd_torch(X,P):
 
 
 
-
+ 
 def svd_symmetric_torch(M):
-  s,u = torch.linalg.eigh(M)  #eigenvalues and eigenvectors
+  # print("svd_symmetric_torch-1", flush=True)
+  # if torch.cuda.is_available():
+  #   M_cpu = M.to("cpu")
+  #   del M
+  #   print("HERE", flush=True)
+  #   print("M_cpu: ", M_cpu.device, M_cpu.dtype,  flush=True)
+  #   s,u = torch.linalg.eigh(M_cpu)
+
+  #   print("s: ", s.device, flush=True)
+  #   print("u: ", u.device, flush=True)
+
+  #   s.to(device)
+  #   u.to(device)
+
+  # else:
+  #   s,u = torch.linalg.eigh(M)  #eigenvalues and eigenvectors
+  s,u = torch.linalg.eigh(M)
 
   s, indices = torch.sort(s, descending=True)
+  print("svd_symmetric_torch-3", flush=True)
   u = u[:, indices]
 
   v = u.clone()
@@ -54,54 +75,76 @@ def svd_symmetric_torch(M):
 
   return u, s, torch.t(v)
 
-
+ 
 def calc_svd_p_torch(d):
   epsilon = CONST_C*torch.mean(d, dim=tuple(np.arange(len(d.shape))))
 
   W = torch.exp(-1*d/epsilon)
-  S_vec = torch.sum(W,dim=1)
 
+  S_vec = torch.sum(W,dim=1)
   S = torch.diag(1/S_vec)
+  
   del S_vec
-  W_gal = torch.matmul(torch.matmul(S,W),S)
+  # print("S.shape: ", S.shape, flush=True)
+  # print("W.shape: ", W.shape, flush=True)
+  
+  # res1 = torch.mm(S,W) 
+
+  S = S.type(torch.float32)
+  W = W.type(torch.float32)
+
+  W_gal_tmp = torch.mm(S,W)
+
+  # print("TEST: ", torch.linalg.norm(res1-W_gal_tmp))
+  # print("S.shape: ", S.shape, flush=True)
+  # print("W_gal_tmp.shape: ", W_gal_tmp.shape, flush=True)
+  
+  W_gal_tmp = W_gal_tmp.type(torch.float32)
+
+  W_gal = torch.mm(W_gal_tmp,S)
+  
+  
+  del W_gal_tmp
   del W
   del S
 
   D_vec = torch.sum(W_gal,dim=1)
-
+  
   D_minus_half = torch.diag(1 / torch.sqrt(D_vec))
   D_plus_half = torch.diag(torch.sqrt(D_vec))
   del D_vec
-
+  
   M = torch.matmul(torch.matmul(D_minus_half,W_gal),D_minus_half)
+  
   del W_gal
-
-  torch.cuda.empty_cache()
-
+#   gc.collect()
+#   torch.cuda.empty_cache()
   U,S,UT = svd_symmetric_torch(M)
   del M
-
+  
   res = (torch.matmul(D_minus_half,U)),(S),(torch.matmul(UT,D_plus_half))
-
 
   del S
   del D_minus_half
   del D_plus_half
   del U
   del UT
-  torch.cuda.empty_cache()
+#   gc.collect()
+#   torch.cuda.empty_cache()
 
   return res
 
 
-
+ 
 def hde_torch(shortest_paths_mat):
+  print("hde_torch", flush=True)
   U, S_keep, Vt = calc_svd_p_torch(shortest_paths_mat)
   
   U = U.double()
   S_keep = S_keep.double()
   Vt = Vt.double()
 
+  print("hde_torch- BEFORE LOOP", flush=True)
   X = torch.zeros((CONST_K + 1, shortest_paths_mat.shape[0], shortest_paths_mat.shape[1] + 1), dtype=torch.float64, device=device)
   for k in range (0, CONST_K + 1):
     S = torch.float_power(S_keep, 2 ** (-k))
@@ -113,12 +156,16 @@ def hde_torch(shortest_paths_mat):
 
     del aux
     del S
-    torch.cuda.empty_cache()
+    # gc.collect()
+    # torch.cuda.empty_cache()
+  
+  print("hde_torch- AFTER LOOP", flush=True)
 
   del U
   del Vt
   del S_keep
-  torch.cuda.empty_cache()
+#   gc.collect()
+#   torch.cuda.empty_cache()
 
   return X
 
@@ -127,7 +174,7 @@ def hde_torch(shortest_paths_mat):
 
 
 
-
+ 
 def padWithZeros_torch(X, left_margin, right_margin, top_margin, bottom_margin, dim=3):
     if dim == 3:
         newX = torch.zeros((X.shape[0] + left_margin + right_margin, X.shape[1] + top_margin + bottom_margin, X.shape[2]), dtype=X.dtype, device=device)
@@ -142,9 +189,7 @@ def padWithZeros_torch(X, left_margin, right_margin, top_margin, bottom_margin, 
 
     return newX 
 
-def stam():
-    pass
-
+ 
 def calc_patch_label_torch(labels, i, j, rows_factor, cols_factor, method='center'):
     if method=='center':
         return labels[i*rows_factor + rows_factor//2, j*cols_factor + cols_factor//2]
@@ -159,6 +204,7 @@ def calc_patch_label_torch(labels, i, j, rows_factor, cols_factor, method='cente
     
     print("ERROR- INCORRECT METHOD FOR LABELING PATCHES")
 
+ 
 def patch_data_torch(data, labels, rows_factor, cols_factor, method_label_patch):
     rows, cols, channels = data.shape
 
@@ -184,7 +230,7 @@ def patch_data_torch(data, labels, rows_factor, cols_factor, method_label_patch)
 
     return patched_data, patched_labels, labels
 
-
+ 
 def normalize_each_band_torch(X):
     
     X_normalized = torch.zeros_like(X, dtype=torch.float64, device=device)
@@ -199,10 +245,11 @@ def normalize_each_band_torch(X):
 
 import time
 
+ 
 def calc_P_torch(d, apply_2_norm=False):
   epsilon = CONST_C*torch.mean(d, dim=tuple(np.arange(len(d.shape))))
 
-  print("epsilon: ", epsilon)
+  print("epsilon: ", epsilon, flush=True)
   W = torch.exp(-1*d/epsilon)
 
   if apply_2_norm:
@@ -231,11 +278,12 @@ def calc_P_torch(d, apply_2_norm=False):
     del D
 
   del W
-  torch.cuda.empty_cache()
+#   gc.collect()
+#   torch.cuda.empty_cache()
 
   return P
 
-
+ 
 def prepare_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, method_label_patch='center'):
     # print("$$$$$$$$$$ IN PREPERATION $$$$$$$$$$$$")
 
@@ -266,7 +314,10 @@ def prepare_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, me
     distances = torch.cdist(X_patches, X_patches)
     
     del X_patches
-    torch.cuda.empty_cache()
+    # gc.collect()
+    # torch.cuda.empty_cache()
+
+
     # print("DISTANCES WITH CDIST: ", time.time()-st)
     # st = time.time()
 
@@ -285,18 +336,24 @@ def prepare_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, me
 
 
 
-
+ 
 def calc_hdd_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, method_label_patch='center'):
     st = time.time()
     distances,P,y_patches,num_patches_in_row, labels_padded = prepare_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=is_normalize_each_band, method_label_patch=method_label_patch)
     
-    print("PREPARE TIME: ", time.time()-st)
+    print("PREPARE TIME: ", time.time()-st, flush=True)
     st = time.time()
+
+    # gc.collect()
+    # torch.cuda.empty_cache()
+
+    print("calc_hdd_torch-before HDE", flush=True)
 
     HDE = hde_torch(distances)
 
     del distances
-    torch.cuda.empty_cache()
+    # gc.collect()
+    # torch.cuda.empty_cache()
 
     torch.abs(HDE, out=HDE)
 
@@ -304,11 +361,17 @@ def calc_hdd_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, m
     st = time.time()
 
     # print("HDE.shape: ", HDE.shape)
-    
+    print("calc_hdd_torch-before HDD", flush=True)
+
     hdd_mat = hdd_torch(HDE, P)
 
+    print("calc_hdd_torch-after HDD", flush=True)
+
     del HDE
-    torch.cuda.empty_cache()
+    # gc.collect()
+    # torch.cuda.empty_cache()
+
+
     # hdd_mat_2 = hdd(HDE, P)
     # print("NORM: ", np.linalg.norm(hdd_mat-hdd_mat_2))
 
@@ -317,35 +380,35 @@ def calc_hdd_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, m
     return hdd_mat, labels_padded, num_patches_in_row,y_patches
 
 def whole_pipeline_all_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, method_label_patch='center'):
-    print("XXXXXXX IN METHOD XXXXXXXXX")
-    st = time.time()
+        print("XXXXXXX IN METHOD XXXXXXXXX")
+        st = time.time()
 
-    X = X.to(device)
-    y = y.to(device)
+        X = X.to(device)
+        y = y.to(device)
 
-    d_HDD, labels_padded, num_patches_in_row,y_patches = calc_hdd_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=is_normalize_each_band, method_label_patch=method_label_patch)
+        d_HDD, labels_padded, num_patches_in_row,y_patches = calc_hdd_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=is_normalize_each_band, method_label_patch=method_label_patch)
 
-    print("WHOLE METHOD TIME: ", time.time()-st)
-    st = time.time()
+        print("WHOLE METHOD TIME: ", time.time()-st, flush=True)
+        st = time.time()
 
-    print("XXXXXXX IN CLASSIFICATION XXXXXXXXX")
-    n_neighbors = 3
+        print("XXXXXXX IN CLASSIFICATION XXXXXXXXX")
+        n_neighbors = 3
 
-    y_patches = y_patches.int()
-    
-    if torch.cuda.is_available():
-        d_HDD = d_HDD.cpu()
-        y_patches = y_patches.cpu()
-        labels_padded = labels_padded.cpu()
-
-
-    main(d_HDD.numpy(), y_patches.numpy(), n_neighbors, labels_padded.numpy(), rows_factor, cols_factor, num_patches_in_row)
-
-    print("WHOLE CLASSIFICATION TIME: ", time.time()-st)
+        y_patches = y_patches.int()
+        
+        if torch.cuda.is_available():
+            d_HDD = d_HDD.cpu()
+            y_patches = y_patches.cpu()
+            labels_padded = labels_padded.cpu()
 
 
+        main(d_HDD.numpy(), y_patches.numpy(), n_neighbors, labels_padded.numpy(), rows_factor, cols_factor, num_patches_in_row)
+
+        print("WHOLE CLASSIFICATION TIME: ", time.time()-st)
 
 
+
+ 
 def whole_pipeline_divided_torch(X,y, rows_factor, cols_factor, is_normalize_each_band=True, method_label_patch='center', is_print=False):
     st = time.time()
     
@@ -364,7 +427,8 @@ def whole_pipeline_divided_torch(X,y, rows_factor, cols_factor, is_normalize_eac
             del d_HDD
             del labels_padded
             del y_patches
-            torch.cuda.empty_cache()
+            # gc.collect()
+            # torch.cuda.empty_cache()
 
     
 
@@ -384,6 +448,7 @@ def whole_pipeline_divided_torch(X,y, rows_factor, cols_factor, is_normalize_eac
 
 from initial_plots import read_dataset
 
+ 
 def test_torch_implementation():
     df = read_dataset(gt=False)
 
